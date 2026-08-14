@@ -32,6 +32,7 @@ import {
 import { primitiveProvider, localGltfProvider } from "./src/assets.js";
 import { createPlan2D, TOOLS } from "./src/plan2d.js";
 import { createView3D } from "./src/view3d.js";
+import { getStarterTemplate } from "./src/templates.js";
 
 const PLAN_TOOLS = new Set([
   TOOLS.SELECT,
@@ -53,6 +54,7 @@ const el = {
   viewCanvas: document.getElementById("view-canvas"),
   fileJson: document.getElementById("file-json"),
   fileGlb: document.getElementById("file-glb"),
+  templateGrid: document.getElementById("template-grid"),
 };
 
 let session = bootSession();
@@ -504,9 +506,8 @@ function doRedo() {
   setStatus("Redo");
 }
 
-function newProject() {
-  if (!confirm("Start a blank project? Unsaved changes stay only if you already saved JSON.")) return;
-  resetSession(session, createBlankProject({ name: "Untitled" }));
+function replaceProjectDoc(doc) {
+  resetSession(session, doc);
   localGltfProvider.syncFromDocAssets(session.doc.assets);
   shellSelection = null;
   selectedAssetId = null;
@@ -523,27 +524,27 @@ function newProject() {
   renderCatalog();
   renderInspector();
   updateUndoButtons();
+}
+
+function newProject() {
+  if (!confirm("Start a blank project? Unsaved changes stay only if you already saved JSON.")) return;
+  replaceProjectDoc(createBlankProject({ name: "Untitled" }));
   setStatus("New blank project");
 }
 
 async function loadJsonFile(file) {
   const doc = await loadProjectFile(file);
-  resetSession(session, doc);
-  localGltfProvider.syncFromDocAssets(session.doc.assets);
-  shellSelection = null;
-  selectedAssetId = null;
-  plan2d.setSession(session);
-  plan2d.setSelection({ kind: null, id: null });
-  plan2d.fitView();
-  view3d.setSelection(null);
-  view3d.rebuild();
-  view3d.focusExtents();
-  persistQuiet();
-  setShellTool(TOOLS.SELECT);
-  renderCatalog();
-  renderInspector();
-  updateUndoButtons();
+  replaceProjectDoc(doc);
   setStatus(`Loaded ${session.doc.project?.name || "project"}`);
+}
+
+function loadStarterTemplate(templateId) {
+  const template = getStarterTemplate(templateId);
+  if (!template) return;
+  const ok = confirm(`Load “${template.label}”? This will discard unsaved changes in the current project.`);
+  if (!ok) return;
+  replaceProjectDoc(template.doc);
+  setStatus(`Loaded template: ${template.label}`);
 }
 
 async function importGlbFile(file) {
@@ -634,6 +635,12 @@ el.fileGlb.addEventListener("change", async () => {
   el.fileGlb.value = "";
   if (!file) return;
   await importGlbFile(file);
+});
+
+el.templateGrid?.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-template-id]");
+  if (!btn) return;
+  loadStarterTemplate(btn.dataset.templateId);
 });
 
 document.querySelectorAll(".mode").forEach((btn) => {
