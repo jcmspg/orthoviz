@@ -202,6 +202,11 @@ export function createPlan2D(canvas, session, options = {}) {
     return `${Math.round(m * 1000)} mm`;
   }
 
+  function floorAreaLabel(floor) {
+    const area = Math.max(0, (Number(floor?.w) || 0) * (Number(floor?.d) || 0));
+    return `${area.toFixed(2)} m²`;
+  }
+
   function notifyDoc(meta = {}) {
     scheduleDraw();
     emit("change", activeSession, meta);
@@ -911,6 +916,7 @@ export function createPlan2D(canvas, session, options = {}) {
     drawFloors();
     drawStairs();
     drawWalls();
+    drawFloorLabels();
     drawDraft();
     drawExtentRulers();
     drawLiveDimension();
@@ -981,6 +987,24 @@ export function createPlan2D(canvas, session, options = {}) {
       ctx.fill();
       ctx.stroke();
     }
+  }
+
+  function drawFloorLabels() {
+    ctx.save();
+    ctx.font = "500 12px ui-sans-serif, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const floor of activeSession.doc.floors) {
+      const f = floorGeom(floor);
+      const c = worldToScreen(f.x + f.w * 0.5, f.y + f.d * 0.5);
+      const label = floorAreaLabel(f);
+      const tw = ctx.measureText(label).width + 10;
+      ctx.fillStyle = "rgba(243, 241, 236, 0.9)";
+      ctx.fillRect(c.x - tw / 2, c.y - 9, tw, 18);
+      ctx.fillStyle = "rgba(30, 40, 36, 0.9)";
+      ctx.fillText(label, c.x, c.y);
+    }
+    ctx.restore();
   }
 
   function drawStairs() {
