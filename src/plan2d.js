@@ -116,6 +116,8 @@ export function createPlan2D(canvas, session, options = {}) {
   let drag = null;
   /** @type {null | { wallId: string, dist: number }} */
   let hoverWall = null;
+  /** @type {PlanSelection} */
+  let hoverSelection = { kind: null, id: null, wallId: null };
   let pointerWorld = { x: 0, y: 0 };
   let spaceDown = false;
   let panning = false;
@@ -235,6 +237,12 @@ export function createPlan2D(canvas, session, options = {}) {
 
   function updateHintForIdle() {
     if (draft || drag || panning) return;
+    const ext = extents(activeSession.doc);
+    const isEmpty = ext.width <= EPS && ext.depth <= EPS;
+    if (isEmpty && tool === TOOLS.SELECT) {
+      setHint("Click Wall, drag to draw");
+      return;
+    }
     if (tool === TOOLS.SELECT) {
       setHint(selection.kind ? "Drag to move · Del to delete · Esc clears" : "Select a wall, floor, stair, or opening");
     } else if (tool === TOOLS.WALL) {
@@ -344,6 +352,16 @@ export function createPlan2D(canvas, session, options = {}) {
 
   function deleteSelection() {
     if (!selection.kind || !selection.id) return false;
+    const label =
+      selection.kind === "opening"
+        ? "this opening"
+        : selection.kind === "wall"
+          ? "this wall"
+          : selection.kind === "floor"
+            ? "this floor"
+            : "this stair";
+    const ok = typeof window.confirm === "function" ? window.confirm(`Delete ${label}?`) : true;
+    if (!ok) return false;
     if (selection.kind === "wall") {
       commit(commands.deleteWall(selection.id), { reason: "delete" });
     } else if (selection.kind === "floor") {
@@ -632,7 +650,7 @@ export function createPlan2D(canvas, session, options = {}) {
         w: drag.orig.w,
         d: drag.orig.d,
       };
-      setHint(`Move floor (${metersToLabel(dx)}, ${metersToLabel(dy)})`);
+      setHint(`Move floor (${metersToLabel(dx)}, ${metersToLabel(dy)}) · ${metersToLabel(drag.preview.w)} × ${metersToLabel(drag.preview.d)}`);
     } else if (drag.kind === "stair") {
       const dx = snapToGrid(wx - drag.startX, g);
       const dy = snapToGrid(wy - drag.startY, g);
@@ -762,8 +780,13 @@ export function createPlan2D(canvas, session, options = {}) {
     else if (tool === TOOLS.DOOR || tool === TOOLS.WINDOW) {
       const hit = nearestWall(world.x, world.y);
       hoverWall = hit ? { wallId: hit.wallId, dist: hit.dist } : null;
+      hoverSelection = { kind: null, id: null, wallId: null };
+    } else if (!draft && !drag && !panning && tool === TOOLS.SELECT) {
+      hoverWall = null;
+      hoverSelection = normalizeSelection(hitTest(world.x, world.y));
     } else {
       hoverWall = null;
+      hoverSelection = { kind: null, id: null, wallId: null };
     }
     scheduleDraw();
   }
@@ -791,6 +814,7 @@ export function createPlan2D(canvas, session, options = {}) {
 
   function onPointerLeave() {
     hoverWall = null;
+    hoverSelection = { kind: null, id: null, wallId: null };
     scheduleDraw();
   }
 
@@ -872,6 +896,7 @@ export function createPlan2D(canvas, session, options = {}) {
     } else {
       scheduleDraw();
     }
+    hoverSelection = normalizeSelection(hoverSelection);
   }
 
   // --- drawing -------------------------------------------------------------
@@ -973,9 +998,14 @@ export function createPlan2D(canvas, session, options = {}) {
       const hh = Math.abs(b.y - a.y);
       const mat = getMaterial(activeSession.doc, f.materialId);
       const selected = selection.kind === "floor" && selection.id === f.id;
-      ctx.fillStyle = selected ? "rgba(46, 110, 90, 0.28)" : hexToRgba(mat?.color || "#2e3631", 0.22);
-      ctx.strokeStyle = selected ? "#1f6b52" : "rgba(30, 40, 36, 0.35)";
-      ctx.lineWidth = selected ? 2 : 1;
+      const hovered = hoverSelection.kind === "floor" && hoverSelection.id === f.id;
+      ctx.fillStyle = selected
+        ? "rgba(46, 110, 90, 0.28)"
+        : hovered
+          ? "rgba(58, 124, 165, 0.22)"
+          : hexToRgba(mat?.color || "#2e3631", 0.22);
+      ctx.strokeStyle = selected ? "#1f6b52" : hovered ? "#3a7ca5" : "rgba(30, 40, 36, 0.35)";
+      ctx.lineWidth = selected || hovered ? 2 : 1;
       ctx.beginPath();
       ctx.rect(x, y, ww, hh);
       ctx.fill();
@@ -993,9 +1023,14 @@ export function createPlan2D(canvas, session, options = {}) {
       const ww = Math.abs(b.x - a.x);
       const hh = Math.abs(b.y - a.y);
       const selected = selection.kind === "stair" && selection.id === s.id;
-      ctx.fillStyle = selected ? "rgba(140, 100, 60, 0.35)" : "rgba(138, 129, 120, 0.35)";
-      ctx.strokeStyle = selected ? "#8a5a28" : "rgba(90, 70, 50, 0.55)";
-      ctx.lineWidth = selected ? 2 : 1;
+      const hovered = hoverSelection.kind === "stair" && hoverSelection.id === s.id;
+      ctx.fillStyle = selected
+        ? "rgba(140, 100, 60, 0.35)"
+        : hovered
+          ? "rgba(176, 130, 88, 0.35)"
+          : "rgba(138, 129, 120, 0.35)";
+      ctx.strokeStyle = selected ? "#8a5a28" : hovered ? "#a56e34" : "rgba(90, 70, 50, 0.55)";
+      ctx.lineWidth = selected || hovered ? 2 : 1;
       ctx.beginPath();
       ctx.rect(x, y, ww, hh);
       ctx.fill();
@@ -1019,19 +1054,20 @@ export function createPlan2D(canvas, session, options = {}) {
     for (const wall of activeSession.doc.walls) {
       const w = wallGeom(wall);
       const selected = selection.kind === "wall" && selection.id === wall.id;
+      const hoveredSel = hoverSelection.kind === "wall" && hoverSelection.id === wall.id;
       const hover =
         (tool === TOOLS.DOOR || tool === TOOLS.WINDOW) &&
         hoverWall?.wallId === wall.id &&
         !draft;
       const thicknessPx = Math.max(2, (w.thickness || 0.1) * view.scale);
       const mat = getMaterial(activeSession.doc, w.materialId);
-      const color = selected ? "#1f6b52" : hover ? "#3a7ca5" : mat?.color || "#8a8478";
+      const color = selected ? "#1f6b52" : hover || hoveredSel ? "#3a7ca5" : mat?.color || "#8a8478";
 
       ctx.lineCap = "butt";
       ctx.lineJoin = "miter";
       ctx.strokeStyle = color;
       ctx.lineWidth = thicknessPx;
-      ctx.globalAlpha = selected || hover ? 1 : 0.92;
+      ctx.globalAlpha = selected || hover || hoveredSel ? 1 : 0.92;
       const p0 = worldToScreen(w.x0, w.y0);
       const p1 = worldToScreen(w.x1, w.y1);
       ctx.beginPath();
@@ -1042,7 +1078,12 @@ export function createPlan2D(canvas, session, options = {}) {
 
       // Punch openings as lighter gaps + symbol
       for (const opening of wall.openings || []) {
-        drawOpening(w, opening, selected || (selection.kind === "opening" && selection.id === opening.id));
+        drawOpening(
+          w,
+          opening,
+          selected || (selection.kind === "opening" && selection.id === opening.id),
+          hoverSelection.kind === "opening" && hoverSelection.id === opening.id,
+        );
       }
 
       if (selected) {
@@ -1051,7 +1092,7 @@ export function createPlan2D(canvas, session, options = {}) {
     }
   }
 
-  function drawOpening(wall, opening, selected) {
+  function drawOpening(wall, opening, selected, hovered = false) {
     const along = openingAlong(wall, opening);
     const a = pointAtAlong(wall, along);
     const b = pointAtAlong(wall, along + opening.width);
@@ -1068,8 +1109,8 @@ export function createPlan2D(canvas, session, options = {}) {
     ctx.stroke();
 
     const isDoor = opening.type !== "window";
-    ctx.strokeStyle = selected ? "#1f6b52" : isDoor ? "#5c4030" : "#3a6a8a";
-    ctx.lineWidth = selected ? 2.5 : 1.5;
+    ctx.strokeStyle = selected ? "#1f6b52" : hovered ? "#3a7ca5" : isDoor ? "#5c4030" : "#3a6a8a";
+    ctx.lineWidth = selected || hovered ? 2.5 : 1.5;
     ctx.setLineDash(isDoor ? [] : [4, 3]);
     ctx.beginPath();
     ctx.moveTo(pa.x, pa.y);
@@ -1238,6 +1279,24 @@ export function createPlan2D(canvas, session, options = {}) {
           { x: rect.x + rect.w, y: rect.y },
           { x: rect.x + rect.w, y: rect.y + rect.d },
           metersToLabel(rect.d),
+          "right",
+        );
+      }
+      return;
+    }
+    if (drag?.kind === "floor") {
+      const f = drag.preview;
+      if (f) {
+        drawDimLine(
+          { x: f.x, y: f.y + f.d },
+          { x: f.x + f.w, y: f.y + f.d },
+          metersToLabel(f.w),
+          "above",
+        );
+        drawDimLine(
+          { x: f.x + f.w, y: f.y },
+          { x: f.x + f.w, y: f.y + f.d },
+          metersToLabel(f.d),
           "right",
         );
       }

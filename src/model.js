@@ -409,6 +409,54 @@ function clampOpening(wall, opening, grid) {
   };
 }
 
+function within(a, b, c, tol = EPS) {
+  return c >= Math.min(a, b) - tol && c <= Math.max(a, b) + tol;
+}
+
+function snapWallToCorners(doc, wall) {
+  const g = gridOf(doc);
+  const tol = Math.max(g * 0.75, 0.08);
+  const horizontal = isHorizontal(wall);
+  const vertical = !horizontal;
+  const others = (doc.walls || []).filter((w) => w.id !== wall.id);
+  const endpoints = [
+    { x: wall.x0, y: wall.y0 },
+    { x: wall.x1, y: wall.y1 },
+  ];
+
+  const snapOne = (point) => {
+    let best = null;
+    for (const other of others) {
+      const candidates = [
+        { x: other.x0, y: other.y0 },
+        { x: other.x1, y: other.y1 },
+      ];
+      if (horizontal && isVertical(other) && within(other.y0, other.y1, point.y, tol)) {
+        candidates.push({ x: other.x0, y: point.y });
+      } else if (vertical && isHorizontal(other) && within(other.x0, other.x1, point.x, tol)) {
+        candidates.push({ x: point.x, y: other.y0 });
+      }
+      for (const c of candidates) {
+        const d = Math.hypot(point.x - c.x, point.y - c.y);
+        if (d <= tol && (!best || d < best.dist)) {
+          best = { x: c.x, y: c.y, dist: d };
+        }
+      }
+    }
+    if (!best) return point;
+    return snapPoint(best.x, best.y, g);
+  };
+
+  const a = snapOne(endpoints[0]);
+  const b = snapOne(endpoints[1]);
+  if (horizontal) {
+    const y = snapToGrid((a.y + b.y) * 0.5, g);
+    return orthoSegment(a.x, y, b.x, y, g);
+  }
+  const x = snapToGrid((a.x + b.x) * 0.5, g);
+  return orthoSegment(x, a.y, x, b.y, g);
+}
+
 function normalizeWall(doc, payload) {
   const d = defaultsOf(doc);
   const grid = gridOf(doc);
@@ -425,6 +473,11 @@ function normalizeWall(doc, payload) {
     materialId: raw.materialId ?? DEFAULT_MAT_WALL_ID,
     openings: Array.isArray(raw.openings) ? clone(raw.openings) : [],
   };
+  const snapped = snapWallToCorners(doc, wall);
+  wall.x0 = snapped.x0;
+  wall.y0 = snapped.y0;
+  wall.x1 = snapped.x1;
+  wall.y1 = snapped.y1;
   if (raw.levelId) wall.levelId = raw.levelId;
   if (raw.label) wall.label = raw.label;
   if (wallLength(wall) < EPS) throw new Error("Wall length is zero after ortho snap");
@@ -551,6 +604,10 @@ function applyMoveWall(doc, payload) {
     throw new Error("Wall length is zero after move");
   }
   Object.assign(wall, next);
+  Object.assign(wall, snapWallToCorners(doc, wall));
+  for (const opening of wall.openings || []) {
+    Object.assign(opening, clampOpening(wall, opening, grid));
+  }
   return { type: CMD.MOVE_WALL, payload: { id: wall.id, ...prev } };
 }
 
@@ -574,6 +631,10 @@ function applyUpdateWall(doc, payload) {
   }
   if (["x0", "y0", "x1", "y1"].some((k) => patch[k] !== undefined)) {
     Object.assign(wall, orthoSegment(wall.x0, wall.y0, wall.x1, wall.y1, grid));
+    Object.assign(wall, snapWallToCorners(doc, wall));
+    for (const opening of wall.openings || []) {
+      Object.assign(opening, clampOpening(wall, opening, grid));
+    }
   }
   return { type: CMD.UPDATE_WALL, payload: { id: wall.id, patch: prev } };
 }
