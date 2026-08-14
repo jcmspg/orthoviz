@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OrthoViz</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./src/plan2d.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <aside id="sidebar">
+        <header class="brand">
+          <div class="brand-mark">OV</div>
+          <div>
+            <h1>OrthoViz</h1>
+            <p>Orthogonal floor plans · live 3D · local-first</p>
+          </div>
+        </header>
+
+        <section class="block">
+          <h2>Tools</h2>
+          <div class="tool-grid" id="tool-grid" role="toolbar" aria-label="Plan tools">
+            <button type="button" class="tool active" data-tool="select">Select</button>
+            <button type="button" class="tool" data-tool="wall">Wall</button>
+            <button type="button" class="tool" data-tool="door">Door</button>
+            <button type="button" class="tool" data-tool="window">Window</button>
+            <button type="button" class="tool" data-tool="floor">Floor</button>
+            <button type="button" class="tool" data-tool="stair">Stair</button>
+            <button type="button" class="tool" data-tool="furniture">Furniture</button>
+          </div>
+        </section>
+
+        <section class="block">
+          <h2>Project</h2>
+          <div class="row wrap">
+            <button type="button" id="btn-undo" class="btn" title="Ctrl+Z">Undo</button>
+            <button type="button" id="btn-redo" class="btn" title="Ctrl+Y">Redo</button>
+            <button type="button" id="btn-new" class="btn">New</button>
+            <button type="button" id="btn-save" class="btn primary">Save JSON</button>
+            <button type="button" id="btn-load" class="btn">Load JSON</button>
+          </div>
+          <input id="file-json" type="file" accept="application/json,.json" hidden />
+        </section>
+
+        <section class="block">
+          <h2>Furniture catalog</h2>
+          <div id="catalog-list" class="catalog"></div>
+          <div class="row wrap" style="margin-top: 8px">
+            <button type="button" id="btn-import-glb" class="btn">Import GLB</button>
+          </div>
+          <input id="file-glb" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" hidden />
+          <p class="hint" id="furniture-hint">Pick an item, then click the plan to place.</p>
+        </section>
+
+        <section class="block grow">
+          <h2>Inspector</h2>
+          <div id="inspector" class="inspector empty">Nothing selected</div>
+        </section>
+
+        <footer class="sidebar-foot">
+          <span id="status">Ready</span>
+        </footer>
+      </aside>
+
+      <div id="workspace">
+        <section id="plan-pane" class="pane">
+          <header class="pane-bar"><span>2D plan</span><span class="muted">grid 0.10 m · ortho</span></header>
+          <div id="plan-host" class="plan2d-host">
+            <canvas id="plan-canvas"></canvas>
+          </div>
+        </section>
+        <section id="view-pane" class="pane">
+          <header class="pane-bar">
+            <span>3D view</span>
+            <div class="mode-row compact">
+              <button type="button" class="mode active" data-mode="orbit">Orbit</button>
+              <button type="button" class="mode" data-mode="edit">Edit</button>
+              <button type="button" class="mode" data-mode="top">Top</button>
+            </div>
+          </header>
+          <div id="view-host">
+            <canvas id="view-canvas"></canvas>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

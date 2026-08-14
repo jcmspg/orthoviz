@@ -1,0 +1,23 @@
+# Dependencies / tooling
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+.cursor/
+.vscode/
+*.swp
+*~
+
+# Local / browser junk
+localStorage*
+*.local
+
+# Large / listing-specific binaries (not part of OrthoViz product)
+*.jfif
+underlay.jpg
+idealista_*
+scan.png
+plan.js
+
+# Legacy / personal naming leftovers
+carnaxide*
