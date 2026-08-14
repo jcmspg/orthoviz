@@ -32,6 +32,7 @@ import {
 import { primitiveProvider, localGltfProvider } from "./src/assets.js";
 import { createPlan2D, TOOLS } from "./src/plan2d.js";
 import { createView3D } from "./src/view3d.js";
+import { exportPlanPng, exportViewPng } from "./src/export.js";
 
 const PLAN_TOOLS = new Set([
   TOOLS.SELECT,
@@ -616,6 +617,25 @@ document.getElementById("btn-save")?.addEventListener("click", () => {
   setStatus(`Saved ${name}`);
 });
 document.getElementById("btn-load")?.addEventListener("click", () => el.fileJson.click());
+document.getElementById("btn-export-plan-png")?.addEventListener("click", async () => {
+  try {
+    plan2d.redraw();
+    const name = await exportPlanPng(el.planCanvas, { projectName: session.doc?.project?.name });
+    setStatus(`Exported ${name}`);
+  } catch (err) {
+    console.error(err);
+    setStatus(err.message || "Plan PNG export failed");
+  }
+});
+document.getElementById("btn-export-view-png")?.addEventListener("click", async () => {
+  try {
+    const name = await exportViewPng(el.viewCanvas, { projectName: session.doc?.project?.name });
+    setStatus(`Exported ${name}`);
+  } catch (err) {
+    console.error(err);
+    setStatus(err.message || "3D PNG export failed");
+  }
+});
 el.fileJson.addEventListener("change", async () => {
   const file = el.fileJson.files?.[0];
   el.fileJson.value = "";

@@ -47,6 +47,7 @@ export function createView3D(canvas, session, options = {}) {
     canvas,
     antialias: true,
     alpha: false,
+    preserveDrawingBuffer: true,
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;

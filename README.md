@@ -13,6 +13,7 @@ Draw axis-aligned floor plans in the browser, see them update instantly in 3D, p
 - **Furniture** — built-in primitives plus **GLB / glTF import**
 - **Undo / redo** — full command history
 - **Save / load** — download or restore JSON; last project also auto-saves locally in the browser
+- **Export images** — download the current 2D plan or 3D view as PNG
 
 ## Run locally
 
@@ -35,7 +36,7 @@ Open [http://localhost:8765/](http://localhost:8765/)
 1. Choose **Wall**, **Door**, **Window**, **Floor**, or **Stair** and draw on the 2D plan
 2. Use **Select** to move items; **Del** deletes; the inspector edits thickness, color, and texture
 3. Pick a furniture catalog item (or **Import GLB**), then click the plan to place; **R** rotates 90°; use **Edit** mode for 3D gizmos
-4. **Save JSON** / **Load JSON** to export or restore a project
+4. Use **Export plan PNG** / **Export 3D PNG** for image snapshots, and **Save JSON** / **Load JSON** for project files
 
 Units are meters. Projects start blank — build any layout you need.
 
