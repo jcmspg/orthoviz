@@ -40,6 +40,7 @@ const PLAN_TOOLS = new Set([
   TOOLS.WINDOW,
   TOOLS.FLOOR,
   TOOLS.STAIR,
+  TOOLS.MEASURE,
 ]);
 
 const el = {

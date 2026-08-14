@@ -21,7 +21,8 @@
 
 .plan2d-host[data-tool="wall"] canvas,
 .plan2d-host[data-tool="floor"] canvas,
-.plan2d-host[data-tool="stair"] canvas {
+.plan2d-host[data-tool="stair"] canvas,
+.plan2d-host[data-tool="measure"] canvas {
   cursor: crosshair;
 }
 

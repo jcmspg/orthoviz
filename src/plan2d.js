@@ -36,6 +36,7 @@ export const TOOLS = Object.freeze({
   WINDOW: "window",
   FLOOR: "floor",
   STAIR: "stair",
+  MEASURE: "measure",
 });
 
 const EPS = 1e-9;
@@ -112,6 +113,8 @@ export function createPlan2D(canvas, session, options = {}) {
 
   /** @type {null | object} */
   let draft = null;
+  /** @type {null | { x0: number, y0: number, x1: number, y1: number }} */
+  let measure = null;
   /** @type {null | object} */
   let drag = null;
   /** @type {null | { wallId: string, dist: number }} */
@@ -202,6 +205,11 @@ export function createPlan2D(canvas, session, options = {}) {
     return `${Math.round(m * 1000)} mm`;
   }
 
+  function metersToMeasureLabel(m) {
+    if (!Number.isFinite(m)) return "—";
+    return `${Math.max(0, m).toFixed(2)} m`;
+  }
+
   function notifyDoc(meta = {}) {
     scheduleDraw();
     emit("change", activeSession, meta);
@@ -247,6 +255,13 @@ export function createPlan2D(canvas, session, options = {}) {
       setHint("Click a wall, then drag door width along it");
     } else if (tool === TOOLS.WINDOW) {
       setHint("Click a wall, then drag window width along it");
+    } else if (tool === TOOLS.MEASURE) {
+      if (measure) {
+        const len = Math.hypot(measure.x1 - measure.x0, measure.y1 - measure.y0);
+        setHint(`Measure ${metersToMeasureLabel(len)} · Click to start a new measure · Esc clears`);
+      } else {
+        setHint("Click point A, then point B to measure distance");
+      }
     }
   }
 
@@ -367,6 +382,17 @@ export function createPlan2D(canvas, session, options = {}) {
     scheduleDraw();
   }
 
+  function clearMeasure() {
+    const hadDraftMeasure = draft?.type === "measure";
+    if (hadDraftMeasure) draft = null;
+    const hadMeasure = !!measure;
+    measure = null;
+    if (hadDraftMeasure || hadMeasure) {
+      updateHintForIdle();
+      scheduleDraw();
+    }
+  }
+
   // --- tool actions --------------------------------------------------------
 
   function beginWall(wx, wy) {
@@ -456,6 +482,31 @@ export function createPlan2D(canvas, session, options = {}) {
     const stored = commit(commands.addStair(rect), { reason: "draw-stair" });
     const id = stored.payload?.stair?.id;
     if (id) setSelectionInternal({ kind: "stair", id });
+  }
+
+  function beginOrFinishMeasure(wx, wy) {
+    const p = snapWorld(wx, wy);
+    if (!draft || draft.type !== "measure") {
+      measure = null;
+      draft = { type: "measure", x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+      setHint("Move to point B, then click · Esc clears");
+      return;
+    }
+    draft.x1 = p.x;
+    draft.y1 = p.y;
+    const len = Math.hypot(draft.x1 - draft.x0, draft.y1 - draft.y0);
+    measure = { x0: draft.x0, y0: draft.y0, x1: draft.x1, y1: draft.y1 };
+    draft = null;
+    setHint(`Measure ${metersToMeasureLabel(len)} · Click to start a new measure · Esc clears`);
+  }
+
+  function updateMeasureDraft(wx, wy) {
+    if (!draft || draft.type !== "measure") return;
+    const p = snapWorld(wx, wy);
+    draft.x1 = p.x;
+    draft.y1 = p.y;
+    const len = Math.hypot(draft.x1 - draft.x0, draft.y1 - draft.y0);
+    setHint(`Measure ${metersToMeasureLabel(len)} · Click to place point B · Esc clears`);
   }
 
   function normalizeRect(x0, y0, x1, y1) {
@@ -730,6 +781,8 @@ export function createPlan2D(canvas, session, options = {}) {
       beginOpening(world.x, world.y, "door");
     } else if (tool === TOOLS.WINDOW) {
       beginOpening(world.x, world.y, "window");
+    } else if (tool === TOOLS.MEASURE) {
+      beginOrFinishMeasure(world.x, world.y);
     } else {
       beginSelectDrag(world.x, world.y, hitTest(world.x, world.y));
     }
@@ -758,6 +811,7 @@ export function createPlan2D(canvas, session, options = {}) {
     else if (draft?.type === "floor") updateFloorDraft(world.x, world.y);
     else if (draft?.type === "stair") updateStairDraft(world.x, world.y);
     else if (draft?.type === "opening") updateOpeningDraft(world.x, world.y);
+    else if (draft?.type === "measure") updateMeasureDraft(world.x, world.y);
     else if (drag) updateSelectDrag(world.x, world.y);
     else if (tool === TOOLS.DOOR || tool === TOOLS.WINDOW) {
       const hit = nearestWall(world.x, world.y);
@@ -841,7 +895,9 @@ export function createPlan2D(canvas, session, options = {}) {
     }
 
     if (e.key === "Escape") {
-      if (draft || drag) {
+      if (draft?.type === "measure" || measure) {
+        clearMeasure();
+      } else if (draft || drag) {
         cancelDraft();
       } else {
         setSelectionInternal({ kind: null, id: null });
